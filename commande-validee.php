@@ -115,6 +115,7 @@ class GestionnaireCommande {
                 }
                 
                 if ($prix > 0) {
+                    $produitIdForDb = (is_numeric($product_id) && (int)$product_id > 0) ? (int)$product_id : 0;
                     $sqlDetail = "INSERT INTO details_commande (
                         commande_id, produit_id, nom_produit, prix_unitaire, quantite
                     ) VALUES (?, ?, ?, ?, ?)";
@@ -122,27 +123,27 @@ class GestionnaireCommande {
                     $stmtDetail = $this->pdo->prepare($sqlDetail);
                     $stmtDetail->execute([
                         $commandeId,
-                        $product_id,
+                        $produitIdForDb,
                         $nom,
                         $prix,
                         $item['quantite']
                     ]);
                     
-                    // Mettre à jour le stock si possible
-                    try {
-                        $sqlStock = "UPDATE produits SET 
-                            stock_quantite = GREATEST(0, stock_quantite - ?),
-                            ventes_total = COALESCE(ventes_total, 0) + ?
-                            WHERE id = ?";
-                        
-                        $stmtStock = $this->pdo->prepare($sqlStock);
-                        $stmtStock->execute([
-                            $item['quantite'],
-                            $item['quantite'],
-                            $product_id
-                        ]);
-                    } catch (Exception $e) {
-                        error_log("Erreur mise à jour stock: " . $e->getMessage());
+                    if ($produitIdForDb > 0) {
+                        try {
+                            $sqlStock = "UPDATE produits SET 
+                                stock_quantite = GREATEST(0, stock_quantite - ?),
+                                ventes_total = COALESCE(ventes_total, 0) + ?
+                                WHERE id = ?";
+                            $stmtStock = $this->pdo->prepare($sqlStock);
+                            $stmtStock->execute([
+                                $item['quantite'],
+                                $item['quantite'],
+                                $produitIdForDb
+                            ]);
+                        } catch (Exception $e) {
+                            error_log("Erreur mise à jour stock: " . $e->getMessage());
+                        }
                     }
                 }
             }
@@ -193,95 +194,33 @@ try {
 }
 ?>
 
+<?php $current_page = ''; ?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Commande Validée | Figurines</title>
+    <title>Commande validée | Figurine Store</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="vendor/bootstrap/css/bootstrap.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/fontawesome.css">
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/theme.css">
     <style>
-        body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 30px 0;
-        }
-
-        .confirmation-container {
-            max-width: 600px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            overflow: hidden;
-        }
-
-        .confirmation-header {
-            background: linear-gradient(135deg, #00b894, #00cec9);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-
-        .error-header {
-            background: linear-gradient(135deg, #e17055, #d63031);
-        }
-
-        .confirmation-content {
-            padding: 30px;
-            text-align: center;
-        }
-
-        .order-number {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 20px 0;
-            border-left: 5px solid #00b894;
-        }
-
-        .error-message {
-            background: #fff5f5;
-            border: 1px solid #feb2b2;
-            color: #c53030;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 20px 0;
-        }
-
-        .btn-custom {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border: none;
-            color: white;
-            padding: 12px 30px;
-            border-radius: 25px;
-            text-decoration: none;
-            display: inline-block;
-            margin: 10px;
-        }
-
-        .btn-custom:hover {
-            background: linear-gradient(135deg, #5a67d8, #6b46c1);
-            color: white;
-            text-decoration: none;
-        }
-
-        .success-icon {
-            font-size: 4rem;
-            color: #00b894;
-            margin-bottom: 20px;
-        }
-
-        .error-icon {
-            font-size: 4rem;
-            color: #d63031;
-            margin-bottom: 20px;
-        }
+        .confirmation-container { max-width: 600px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); overflow: hidden; border: 1px solid rgba(0,0,0,0.08); }
+        .confirmation-header { background: linear-gradient(135deg, #D32F2F, #B71C1C); color: #fff; padding: 2rem; text-align: center; }
+        .error-header { background: linear-gradient(135deg, #c62828, #b71c1c); }
+        .confirmation-content { padding: 2rem; text-align: center; }
+        .order-number { background: #f5f5f5; padding: 1.25rem; border-radius: 12px; margin: 1.25rem 0; border-left: 4px solid #D32F2F; }
+        .error-message { background: #fff5f5; border: 1px solid #ffcdd2; color: #c62828; padding: 1rem; border-radius: 8px; margin: 1rem 0; }
+        .btn-custom { background: #D32F2F; border: none; color: #fff; padding: 0.6rem 1.5rem; border-radius: 8px; text-decoration: none; display: inline-block; margin: 0.5rem; font-weight: 600; transition: 0.3s; }
+        .btn-custom:hover { background: #B71C1C; color: #fff; text-decoration: none; transform: translateY(-2px); }
+        .success-icon { font-size: 3rem; color: #D32F2F; margin-bottom: 1rem; }
+        .error-icon { font-size: 3rem; color: #c62828; margin-bottom: 1rem; }
     </style>
 </head>
-<body>
-
-<div class="container">
+<body class="theme-figurine">
+<?php include 'includes/header.php'; ?>
+<div class="container theme-main py-5" style="padding-top: 6rem !important;">
     <div class="confirmation-container">
         <?php if ($commandeReussie): ?>
             <!-- Commande réussie -->
@@ -298,7 +237,7 @@ try {
                 
                 <div class="order-number">
                     <h5>Numéro de commande :</h5>
-                    <h3 class="text-primary"><?php echo htmlspecialchars($numeroCommande); ?></h3>
+                    <h3 class="text-danger"><?php echo htmlspecialchars($numeroCommande); ?></h3>
                     <p class="mb-0">Montant total : <strong><?php echo number_format($totalCommande, 2); ?>€</strong></p>
                 </div>
                 
@@ -340,9 +279,6 @@ try {
         <?php endif; ?>
     </div>
 </div>
-
-<script src="vendor/jquery/jquery.min.js"></script>
-<script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
-
+<?php include 'includes/footer.php'; ?>
 </body>
 </html>

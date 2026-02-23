@@ -1,20 +1,47 @@
 <?php
 session_start();
 
-// Connexion à la base de données
-$serveur = "localhost";
-$utilisateur = "root";
-$mot_de_passe = "";
-$base_de_donnees = "figurine_db";
+// --- 1. CONFIGURATION AVATAR & BDD ---
+$host = "localhost";
+$db   = "figurine_db";
+$user = "root";
+$pass = "";
+
+$base_assets = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
+$base_assets = ($base_assets === '' || $base_assets === '\\') ? '' : $base_assets . '/';
+$user_avatar = $base_assets . 'assets/img/default-avatar.png';
+if (!file_exists(__DIR__ . '/assets/img/default-avatar.png')) {
+    $user_avatar = 'https://bootdey.com/img/Content/avatar/avatar7.png';
+}
 
 try {
-    $pdo = new PDO("mysql:host=$serveur;dbname=$base_de_donnees;charset=utf8", $utilisateur, $mot_de_passe);
+    $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+    if (isset($_SESSION['user_id'])) {
+        if (!empty($_SESSION['user_avatar']) && is_string($_SESSION['user_avatar']) && file_exists(__DIR__ . '/' . $_SESSION['user_avatar'])) {
+            $user_avatar = $base_assets . $_SESSION['user_avatar'];
+        } else {
+            $stmt = $pdo->prepare("SELECT username, avatar, photo_profil FROM users WHERE id = ?");
+            $stmt->execute([$_SESSION['user_id']]);
+            $currentUser = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (is_array($currentUser)) {
+                if (isset($currentUser['username'])) $_SESSION['username'] = $currentUser['username'];
+                $avatarPath = $currentUser['avatar'] ?? $currentUser['photo_profil'] ?? '';
+                if ($avatarPath !== '' && is_string($avatarPath) && file_exists(__DIR__ . '/' . $avatarPath)) {
+                    $user_avatar = $base_assets . $avatarPath;
+                    $_SESSION['user_avatar'] = $avatarPath;
+                } else {
+                    $_SESSION['user_avatar'] = '';
+                }
+            }
+        }
+    }
 } catch(PDOException $e) {
     die("Erreur de connexion : " . $e->getMessage());
 }
 
-// Classe pour gérer les commandes
+// --- 2. LOGIQUE COMMANDE (Intacte) ---
 class GestionnaireCommande {
     private $pdo;
     
@@ -29,11 +56,9 @@ class GestionnaireCommande {
     public function calculerTotalPanier($panier) {
         $total = 0;
         foreach ($panier as $product_id => $item) {
-            // Utiliser le prix déjà stocké dans la session ou récupérer depuis la DB
             if (isset($item['prix'])) {
                 $total += $item['prix'] * $item['quantite'];
             } else {
-                // Fallback: récupérer depuis la base de données
                 $stmt = $this->pdo->prepare("SELECT prix_original, prix_promotion FROM produits WHERE id = ?");
                 $stmt->execute([$product_id]);
                 $produit = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -52,13 +77,12 @@ class GestionnaireCommande {
     public function creerCommande($donneesClient, $panier) {
         $numeroCommande = $this->genererNumeroCommande();
         $sousTotal = $this->calculerTotalPanier($panier);
-        $fraisLivraison = ($sousTotal > 50) ? 0 : 5.99; // Livraison gratuite au-dessus de 50€
+        $fraisLivraison = ($sousTotal > 50) ? 0 : 5.99;
         $total = $sousTotal + $fraisLivraison;
         
         $this->pdo->beginTransaction();
         
         try {
-            // Insérer la commande principale
             $sqlCommande = "INSERT INTO commandes (
                 numero_commande, nom_complet, adresse, ville, code_postal, 
                 methode_paiement, sous_total, frais_livraison, total_commande,
@@ -67,25 +91,17 @@ class GestionnaireCommande {
             
             $stmt = $this->pdo->prepare($sqlCommande);
             $stmt->execute([
-                $numeroCommande,
-                $donneesClient['fullname'],
-                $donneesClient['address'],
-                $donneesClient['city'],
-                $donneesClient['postal'],
-                $donneesClient['card_type'],
-                $sousTotal,
-                $fraisLivraison,
-                $total
+                $numeroCommande, $donneesClient['fullname'], $donneesClient['address'],
+                $donneesClient['city'], $donneesClient['postal'], $donneesClient['card_type'],
+                $sousTotal, $fraisLivraison, $total
             ]);
             
             $commandeId = $this->pdo->lastInsertId();
             
-            // Insérer les détails de la commande
             foreach ($panier as $product_id => $item) {
                 $prix = isset($item['prix']) ? $item['prix'] : 0;
                 $nom = isset($item['nom']) ? $item['nom'] : 'Produit inconnu';
                 
-                // Si pas de prix dans la session, récupérer depuis la DB
                 if ($prix == 0 || empty($nom)) {
                     $stmt = $this->pdo->prepare("SELECT nom, prix_original, prix_promotion FROM produits WHERE id = ?");
                     $stmt->execute([$product_id]);
@@ -93,49 +109,33 @@ class GestionnaireCommande {
                     
                     if ($produit) {
                         $prix = ($produit['prix_promotion'] && $produit['prix_promotion'] > 0) 
-                            ? $produit['prix_promotion'] 
-                            : $produit['prix_original'];
+                            ? $produit['prix_promotion'] : $produit['prix_original'];
                         $nom = $produit['nom'];
                     }
                 }
                 
                 if ($prix > 0) {
+                    $produitIdForDb = (is_numeric($product_id) && (int)$product_id > 0) ? (int)$product_id : 0;
                     $sqlDetail = "INSERT INTO commande_details (
                         commande_id, produit_id, nom_produit, prix_unitaire, quantite
                     ) VALUES (?, ?, ?, ?, ?)";
-                    
                     $stmtDetail = $this->pdo->prepare($sqlDetail);
-                    $stmtDetail->execute([
-                        $commandeId,
-                        $product_id,
-                        $nom,
-                        $prix,
-                        $item['quantite']
-                    ]);
+                    $stmtDetail->execute([$commandeId, $produitIdForDb, $nom, $prix, $item['quantite']]);
                     
-                    // Mettre à jour le stock si la table produits existe
-                    try {
-                        $sqlStock = "UPDATE produits SET 
-                            stock_quantite = GREATEST(0, stock_quantite - ?),
-                            ventes_total = COALESCE(ventes_total, 0) + ?
-                            WHERE id = ?";
-                        
-                        $stmtStock = $this->pdo->prepare($sqlStock);
-                        $stmtStock->execute([
-                            $item['quantite'],
-                            $item['quantite'],
-                            $product_id
-                        ]);
-                    } catch (Exception $e) {
-                        // Si la mise à jour du stock échoue, continuer quand même
-                        error_log("Erreur mise à jour stock: " . $e->getMessage());
+                    if ($produitIdForDb > 0) {
+                        try {
+                            $sqlStock = "UPDATE produits SET 
+                                stock_quantite = GREATEST(0, stock_quantite - ?),
+                                ventes_total = COALESCE(ventes_total, 0) + ?
+                                WHERE id = ?";
+                            $stmtStock = $this->pdo->prepare($sqlStock);
+                            $stmtStock->execute([$item['quantite'], $item['quantite'], $produitIdForDb]);
+                        } catch (Exception $e) {}
                     }
                 }
             }
-            
             $this->pdo->commit();
             return $numeroCommande;
-            
         } catch (Exception $e) {
             $this->pdo->rollback();
             throw $e;
@@ -144,25 +144,19 @@ class GestionnaireCommande {
 }
 
 $gestionnaire = new GestionnaireCommande($pdo);
-
-// Récupérer les informations du panier pour affichage (CORRECTION ICI)
 $panierDetails = [];
 $totalPanier = 0;
 
-// Utiliser $_SESSION['panier'] au lieu de $_SESSION['cart']
 if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
     foreach ($_SESSION['panier'] as $product_id => $item) {
-        // Récupérer les détails du produit depuis la base de données
         $stmt = $pdo->prepare("SELECT * FROM produits WHERE id = ? AND actif = 1");
         $stmt->execute([$product_id]);
         $produit = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($produit) {
             $prix = ($produit['prix_promotion'] && $produit['prix_promotion'] > 0) 
-                ? $produit['prix_promotion'] 
-                : $produit['prix_original'];
+                ? $produit['prix_promotion'] : $produit['prix_original'];
         } else {
-            // Si produit pas trouvé en DB, utiliser le prix de la session
             $prix = isset($item['prix']) ? $item['prix'] : 0;
             $produit = [
                 'nom' => isset($item['nom']) ? $item['nom'] : 'Produit inconnu',
@@ -172,12 +166,12 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
         
         if ($prix > 0) {
             $panierDetails[] = [
+                'product_id' => $product_id,
                 'produit' => $produit,
                 'quantite' => $item['quantite'],
                 'prix_unitaire' => $prix,
                 'sous_total' => $prix * $item['quantite']
             ];
-            
             $totalPanier += $prix * $item['quantite'];
         }
     }
@@ -185,337 +179,229 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
 
 $fraisLivraison = ($totalPanier > 50) ? 0 : 5.99;
 $totalFinal = $totalPanier + $fraisLivraison;
+
+$base_assets = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
+$base_assets = ($base_assets === '' || $base_assets === '\\') ? '' : $base_assets . '/';
+
+$current_page = 'checkout';
 ?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Paiement | Figurines</title>
+    <title>Commande | Figurine Store</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
-    <link rel="stylesheet" href="vendor/bootstrap/css/bootstrap.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/fontawesome.css">
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/theme.css">
     <style>
-        body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-        }
-
-        .payment-container {
-            max-width: 800px;
-            margin: 30px auto;
-            padding: 0;
-            background-color: white;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            overflow: hidden;
-        }
-
-        .payment-header {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            padding: 25px;
-            text-align: center;
-        }
-
-        .payment-content {
-            padding: 30px;
-        }
-
-        .cart-summary {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 25px;
-        }
-
-        .cart-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 0;
-            border-bottom: 1px solid #e9ecef;
-        }
-
-        .cart-item:last-child {
-            border-bottom: none;
-            font-weight: bold;
-            margin-top: 10px;
-            padding-top: 15px;
-            border-top: 2px solid #667eea;
-        }
-
-        .form-section {
-            background: white;
-            border: 1px solid #e9ecef;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-
-        .form-section h5 {
-            color: #667eea;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #667eea;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border: none;
-            padding: 15px;
-            font-size: 1.1em;
-            border-radius: 10px;
-        }
-
-        .btn-primary:hover {
-            background: linear-gradient(135deg, #5a67d8, #6b46c1);
-        }
-
-        .alert-empty-cart {
-            background: linear-gradient(135deg, #ffeaa7, #fdcb6e);
-            border: none;
-            color: #2d3436;
-            border-radius: 10px;
-        }
-
-        footer {
-            background: linear-gradient(135deg, #2d3436, #636e72);
-            color: white;
-            text-align: center;
-            padding: 20px 0;
-            margin-top: 50px;
-        }
+        :root { --checkout-rouge: #D32F2F; --checkout-rouge-fonce: #B71C1C; }
+        .checkout-page { padding-top: 5.5rem; min-height: 100vh; background: linear-gradient(180deg, #f8f9fa 0%, #eef0f2 100%); }
+        .checkout-hero { background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); color: #fff; padding: 2rem 0; margin-bottom: 2rem; }
+        .checkout-hero h1 { font-size: clamp(1.5rem, 4vw, 2rem); font-weight: 800; margin: 0; }
+        .checkout-hero p { margin: 0.5rem 0 0; opacity: 0.9; font-size: 1rem; }
+        .checkout-card { background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); border: 1px solid rgba(0,0,0,0.06); overflow: hidden; margin-bottom: 1.5rem; }
+        .checkout-card .card-header-custom { background: #fff; border-bottom: 2px solid var(--checkout-rouge); padding: 1rem 1.5rem; font-weight: 700; font-size: 1.1rem; color: #1a1a1a; display: flex; align-items: center; gap: 0.5rem; }
+        .checkout-card .card-header-custom i { color: var(--checkout-rouge); }
+        .checkout-card .card-body { padding: 1.5rem; }
+        .checkout-item { display: flex; align-items: center; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid rgba(0,0,0,0.06); }
+        .checkout-item:last-of-type { border-bottom: none; }
+        .checkout-item-img { width: 64px; height: 64px; object-fit: cover; border-radius: 10px; border: 1px solid rgba(0,0,0,0.08); flex-shrink: 0; }
+        .checkout-item-name { font-weight: 600; color: #1a1a1a; }
+        .checkout-item-qty { font-size: 0.9rem; color: #6c757d; }
+        .checkout-item-price { font-weight: 700; color: var(--checkout-rouge); margin-left: auto; }
+        .checkout-item-remove { flex-shrink: 0; }
+        .checkout-item-remove .btn-remove-item { padding: 0.35rem 0.6rem; font-size: 0.8rem; color: #c62828; border-color: #c62828; }
+        .checkout-item-remove .btn-remove-item:hover { background: #c62828; color: #fff; }
+        .checkout-totals { padding: 1rem 0; }
+        .checkout-totals .row-total { display: flex; justify-content: space-between; padding: 0.5rem 0; color: #555; }
+        .checkout-totals .row-total.final { font-size: 1.25rem; font-weight: 800; color: var(--checkout-rouge); border-top: 2px solid rgba(0,0,0,0.08); margin-top: 0.75rem; padding-top: 1rem; }
+        .step-badge { width: 32px; height: 32px; border-radius: 50%; background: var(--checkout-rouge); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; }
+        .form-label { font-weight: 600; color: #333; }
+        .form-control, .form-select { border-radius: 10px; border: 1px solid rgba(0,0,0,0.12); padding: 0.65rem 1rem; }
+        .form-control:focus, .form-select:focus { border-color: var(--checkout-rouge); box-shadow: 0 0 0 0.2rem rgba(211,47,47,0.15); }
+        .input-group-text { border-radius: 10px 0 0 10px; background: #f8f9fa; border-color: rgba(0,0,0,0.12); }
+        .btn-commander { background: linear-gradient(135deg, var(--checkout-rouge), var(--checkout-rouge-fonce)); color: #fff; border: none; font-weight: 700; font-size: 1.1rem; padding: 1rem 1.5rem; border-radius: 12px; width: 100%; transition: transform 0.2s, box-shadow 0.2s; text-transform: uppercase; letter-spacing: 0.05em; }
+        .btn-commander:hover { color: #fff; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(211,47,47,0.35); }
+        .btn-commander:disabled { opacity: 0.7; transform: none; }
+        .empty-cart-box { text-align: center; padding: 3rem 2rem; background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); border: 2px dashed rgba(0,0,0,0.1); }
+        .empty-cart-box .display-4 { color: #ccc; margin-bottom: 1rem; }
+        .empty-cart-box .btn { border-radius: 10px; font-weight: 600; padding: 0.75rem 1.5rem; }
+        .livraison-gratuite { background: rgba(211,47,47,0.08); color: var(--checkout-rouge); font-size: 0.85rem; font-weight: 600; padding: 0.5rem 0.75rem; border-radius: 8px; margin-top: 0.5rem; }
     </style>
 </head>
+<body class="theme-figurine">
+<?php include 'includes/header.php'; ?>
 
-<body>
-
-<!-- NAVBAR -->
-<header>
-    <nav class="navbar navbar-expand-lg navbar-dark" style="background: linear-gradient(135deg, #2d3436, #636e72);">
+<main class="checkout-page">
+    <section class="checkout-hero">
         <div class="container">
-            <a class="navbar-brand" href="index.php">
-                <h2 class="mb-0">BOUTIQUE DE FIGURINE <span style="color: #667eea;">WEBSITE</span></h2>
-            </a>
-            <button class="navbar-toggler" type="button" data-toggle="collapse"
-                    data-target="#navbarResponsive" aria-controls="navbarResponsive"
-                    aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarResponsive">
-                <ul class="navbar-nav ml-auto">
-                    <li class="nav-item"><a class="nav-link" href="index.php">Accueil</a></li>
-                    <li class="nav-item"><a class="nav-link" href="products.php">Produits</a></li>
-                    <li class="nav-item"><a class="nav-link" href="panier.php">Panier</a></li>
-                    <li class="nav-item active"><a class="nav-link" href="checkout.php">Commande</a></li>
-                </ul>
+            <h1><i class="fa fa-shopping-bag me-2"></i>Finaliser la commande</h1>
+            <p>Livraison sécurisée — Paiement en toute confiance</p>
+        </div>
+    </section>
+
+    <div class="container pb-5">
+        <?php if (empty($panierDetails)): ?>
+            <div class="empty-cart-box">
+                <div class="display-4"><i class="fa fa-shopping-cart"></i></div>
+                <h4 class="mb-2">Votre panier est vide</h4>
+                <p class="text-muted mb-4">Ajoutez des figurines avant de passer commande.</p>
+                <a href="products.php" class="btn btn-danger">Voir la boutique</a>
+            </div>
+        <?php else: ?>
+        <div class="row g-4">
+            <div class="col-lg-5 col-xl-4 order-lg-2">
+                <div class="checkout-card sticky-top" style="top: 6rem;">
+                    <div class="card-header-custom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <span><i class="fa fa-receipt"></i> Résumé de la commande</span>
+                        <a href="panier.php" class="btn btn-outline-danger btn-sm">Modifier le panier</a>
+                    </div>
+                    <div class="card-body">
+                        <?php foreach ($panierDetails as $item): 
+                            $img = $item['produit']['image_url'] ?? $item['produit']['image'] ?? '';
+                            $imgSrc = ($img !== '' && strpos($img, 'http') !== 0) ? $base_assets . $img : ($img ?: $base_assets . 'assets/img/default-avatar.png');
+                            $pid = isset($item['product_id']) ? $item['product_id'] : '';
+                        ?>
+                        <div class="checkout-item">
+                            <img src="<?php echo htmlspecialchars($imgSrc); ?>" alt="" class="checkout-item-img">
+                            <div class="flex-grow-1 min-w-0">
+                                <div class="checkout-item-name"><?php echo htmlspecialchars($item['produit']['nom']); ?></div>
+                                <div class="checkout-item-qty">Qté : <?php echo (int)$item['quantite']; ?></div>
+                            </div>
+                            <div class="checkout-item-price"><?php echo number_format($item['sous_total'], 2); ?> €</div>
+                            <div class="checkout-item-remove">
+                                <a href="panier.php?action=remove&id=<?php echo urlencode($pid); ?>&retour=checkout" class="btn btn-outline-danger btn-sm btn-remove-item" onclick="return confirm('Retirer cet article du panier ?');" title="Retirer du panier"><i class="fa fa-trash"></i></a>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                        <div class="checkout-totals">
+                            <div class="row-total"><span>Sous-total</span><span><?php echo number_format($totalPanier, 2); ?> €</span></div>
+                            <div class="row-total"><span>Livraison</span><span><?php echo $fraisLivraison > 0 ? number_format($fraisLivraison, 2) . ' €' : 'Offerte'; ?></span></div>
+                            <?php if ($fraisLivraison == 0): ?><div class="livraison-gratuite"><i class="fa fa-gift me-1"></i> Offerte à partir de 50 € d'achat</div><?php endif; ?>
+                            <div class="row-total final"><span>Total</span><span><?php echo number_format($totalFinal, 2); ?> €</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-7 col-xl-8 order-lg-1">
+                <form action="commande-validee.php" method="POST" id="checkoutForm">
+                    <div class="checkout-card mb-4">
+                        <div class="card-header-custom">
+                            <span class="step-badge">1</span> Adresse de livraison
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="fullname" class="form-label">Nom complet <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="fullname" name="fullname" placeholder="Jean Dupont" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="email" class="form-label">Email</label>
+                                    <input type="email" class="form-control" id="email" name="email" placeholder="jean@email.com">
+                                </div>
+                                <div class="col-12">
+                                    <label for="address" class="form-label">Adresse <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="address" name="address" placeholder="123 Rue de la Figurine" required>
+                                </div>
+                                <div class="col-md-8">
+                                    <label for="city" class="form-label">Ville <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="city" name="city" placeholder="Paris" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="postal" class="form-label">Code postal <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="postal" name="postal" placeholder="75000" required>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="checkout-card mb-4">
+                        <div class="card-header-custom">
+                            <span class="step-badge">2</span> Paiement
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="card_type" class="form-label">Mode de paiement <span class="text-danger">*</span></label>
+                                <select class="form-select" id="card_type" name="card_type" required>
+                                    <option value="">Choisir...</option>
+                                    <option value="visa">Carte Bancaire / Visa</option>
+                                    <option value="mastercard">MasterCard</option>
+                                    <option value="paypal">PayPal</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="card_number" class="form-label">Numéro de carte <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fa fa-credit-card text-muted"></i></span>
+                                    <input type="text" class="form-control" id="card_number" name="card_number" placeholder="0000 0000 0000 0000" maxlength="19" required>
+                                </div>
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="expiry" class="form-label">Expiration (MM/AA) <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="expiry" name="expiry" placeholder="MM/AA" maxlength="5" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="cvv" class="form-label">CVV <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="cvv" name="cvv" placeholder="123" maxlength="4" required>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <input type="hidden" name="sous_total" value="<?php echo htmlspecialchars($totalPanier); ?>">
+                    <input type="hidden" name="frais_livraison" value="<?php echo htmlspecialchars($fraisLivraison); ?>">
+                    <input type="hidden" name="total_commande" value="<?php echo htmlspecialchars($totalFinal); ?>">
+
+                    <div class="checkout-card">
+                        <div class="card-body text-center py-4">
+                            <button type="submit" class="btn btn-commander btn-lg">
+                                <i class="fa fa-lock me-2"></i>Payer <?php echo number_format($totalFinal, 2); ?> €
+                            </button>
+                            <p class="small text-muted mt-3 mb-0"><i class="fa fa-shield-alt"></i> Paiement sécurisé SSL</p>
+                        </div>
+                    </div>
+                </form>
             </div>
         </div>
-    </nav>
-</header>
-
-<!-- FORMULAIRE DE PAIEMENT -->
-<div class="container">
-    <div class="payment-container">
-        <div class="payment-header">
-            <h2>🎭 Finaliser votre commande</h2>
-            <p class="mb-0">Sécurisé et rapide</p>
-        </div>
-        
-        <div class="payment-content">
-            <!-- Résumé du panier -->
-            <?php if (!empty($panierDetails)): ?>
-                <div class="cart-summary">
-                    <h5>📦 Résumé de votre commande</h5>
-                    <?php foreach ($panierDetails as $item): ?>
-                        <div class="cart-item">
-                            <div>
-                                <strong><?php echo htmlspecialchars($item['produit']['nom']); ?></strong>
-                                <br><small>Quantité: <?php echo $item['quantite']; ?></small>
-                            </div>
-                            <div>
-                                <strong><?php echo number_format($item['sous_total'], 2); ?>€</strong>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                    
-                    <div class="cart-item">
-                        <span>Sous-total:</span>
-                        <span><?php echo number_format($totalPanier, 2); ?>€</span>
-                    </div>
-                    
-                    <div class="cart-item">
-                        <span>Frais de livraison:</span>
-                        <span><?php echo ($fraisLivraison > 0) ? number_format($fraisLivraison, 2) . '€' : 'GRATUIT'; ?></span>
-                    </div>
-                    
-                    <div class="cart-item">
-                        <span>TOTAL:</span>
-                        <span><?php echo number_format($totalFinal, 2); ?>€</span>
-                    </div>
-                    
-                    <?php if ($totalPanier < 50): ?>
-                        <small class="text-muted">💡 Livraison gratuite à partir de 50€</small>
-                    <?php endif; ?>
-                </div>
-            <?php else: ?>
-                <div class="alert alert-empty-cart">
-                    ⚠️ Votre panier est vide. <a href="products.php">Ajouter des produits</a> avant de commander.
-                </div>
-            <?php endif; ?>
-
-            <form action="commande-validee.php" method="POST" id="checkoutForm">
-                <!-- Informations personnelles -->
-                <div class="form-section">
-                    <h5>👤 Informations personnelles</h5>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="fullname">Nom complet *</label>
-                                <input type="text" class="form-control" id="fullname" name="fullname" required>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="email">Email</label>
-                                <input type="email" class="form-control" id="email" name="email">
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="address">Adresse complète *</label>
-                        <input type="text" class="form-control" id="address" name="address" required>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-8">
-                            <div class="form-group">
-                                <label for="city">Ville *</label>
-                                <input type="text" class="form-control" id="city" name="city" required>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="form-group">
-                                <label for="postal">Code Postal *</label>
-                                <input type="text" class="form-control" id="postal" name="postal" required>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Méthode de paiement -->
-                <div class="form-section">
-                    <h5>💳 Méthode de paiement</h5>
-                    <div class="form-group">
-                        <label for="card_type">Type de carte *</label>
-                        <select class="form-control" id="card_type" name="card_type" required>
-                            <option value="">-- Choisir --</option>
-                            <option value="visa">💳 Visa</option>
-                            <option value="mastercard">💳 MasterCard</option>
-                            <option value="paypal">🅿️ PayPal</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="card_number">Numéro de carte *</label>
-                        <input type="text" class="form-control" id="card_number" name="card_number" 
-                               placeholder="1234 5678 9012 3456" maxlength="19" required>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="expiry">Expiration (MM/AA) *</label>
-                                <input type="text" class="form-control" id="expiry" name="expiry" 
-                                       placeholder="12/25" maxlength="5" required>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="cvv">CVV *</label>
-                                <input type="text" class="form-control" id="cvv" name="cvv" 
-                                       placeholder="123" maxlength="4" required>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Totaux cachés pour traitement -->
-                <input type="hidden" name="sous_total" value="<?php echo $totalPanier; ?>">
-                <input type="hidden" name="frais_livraison" value="<?php echo $fraisLivraison; ?>">
-                <input type="hidden" name="total_commande" value="<?php echo $totalFinal; ?>">
-
-                <?php if (!empty($panierDetails)): ?>
-                    <button type="submit" class="btn btn-primary btn-block btn-lg">
-                        🔒 Valider le paiement - <?php echo number_format($totalFinal, 2); ?>€
-                    </button>
-                <?php else: ?>
-                    <button type="button" class="btn btn-secondary btn-block btn-lg" disabled>
-                        Panier vide - Impossible de commander
-                    </button>
-                <?php endif; ?>
-            </form>
-        </div>
+        <?php endif; ?>
     </div>
-</div>
+</main>
 
-<!-- FOOTER -->
-<footer>
-    <div class="container">
-        <p>© 2025 Figurine.com - Paiement sécurisé 🔒</p>
-    </div>
-</footer>
-
+<?php include 'includes/footer.php'; ?>
 <script src="vendor/jquery/jquery.min.js"></script>
-<script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
-
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-// Formatage automatique du numéro de carte
-document.getElementById('card_number').addEventListener('input', function(e) {
-    let value = e.target.value.replace(/\s/g, '').replace(/[^0-9]/gi, '');
-    let formattedValue = value.match(/.{1,4}/g)?.join(' ') || value;
-    e.target.value = formattedValue;
-});
-
-// Formatage de la date d'expiration
-document.getElementById('expiry').addEventListener('input', function(e) {
-    let value = e.target.value.replace(/\D/g, '');
-    if (value.length >= 2) {
-        value = value.substring(0, 2) + '/' + value.substring(2, 4);
-    }
-    e.target.value = value;
-});
-
-// Validation CVV
-document.getElementById('cvv').addEventListener('input', function(e) {
-    e.target.value = e.target.value.replace(/[^0-9]/g, '');
-});
-
-// Validation du formulaire
-document.getElementById('checkoutForm').addEventListener('submit', function(e) {
-    const cardNumber = document.getElementById('card_number').value.replace(/\s/g, '');
-    const expiry = document.getElementById('expiry').value;
-    const cvv = document.getElementById('cvv').value;
-    
-    if (cardNumber.length < 13 || cardNumber.length > 19) {
-        alert('Numéro de carte invalide');
-        e.preventDefault();
-        return;
-    }
-    
-    if (!/^\d{2}\/\d{2}$/.test(expiry)) {
-        alert('Date d\'expiration invalide (MM/AA)');
-        e.preventDefault();
-        return;
-    }
-    
-    if (cvv.length < 3 || cvv.length > 4) {
-        alert('CVV invalide');
-        e.preventDefault();
-        return;
-    }
-});
+(function() {
+    var cardNumber = document.getElementById('card_number');
+    var expiry = document.getElementById('expiry');
+    var cvv = document.getElementById('cvv');
+    var form = document.getElementById('checkoutForm');
+    if (!form) return;
+    if (cardNumber) cardNumber.addEventListener('input', function(e) {
+        var v = e.target.value.replace(/\s/g, '').replace(/[^0-9]/g, '');
+        e.target.value = v.match(/.{1,4}/g) ? v.match(/.{1,4}/g).join(' ') : v;
+    });
+    if (expiry) expiry.addEventListener('input', function(e) {
+        var v = e.target.value.replace(/\D/g, '');
+        if (v.length >= 2) v = v.substring(0, 2) + '/' + v.substring(2, 4);
+        e.target.value = v;
+    });
+    if (cvv) cvv.addEventListener('input', function(e) {
+        e.target.value = e.target.value.replace(/[^0-9]/g, '');
+    });
+    form.addEventListener('submit', function(e) {
+        if (!cardNumber) return;
+        var num = cardNumber.value.replace(/\s/g, '');
+        if (num.length < 13 || num.length > 19) {
+            e.preventDefault();
+            alert('Numéro de carte invalide.');
+        }
+    });
+})();
 </script>
 </body>
 </html>

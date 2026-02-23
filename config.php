@@ -1,6 +1,6 @@
 <?php
 $host = "localhost";  // Hôte (généralement localhost)
-$dbname = "bdd_cpx"; // Nom de la base de données
+$dbname = "figurine_db"; // Même base que le reste du site (table users dans users.sql)
 $username = "root"; // Nom d'utilisateur MySQL (par défaut root)
 $password = ""; // Mot de passe MySQL (laisser vide sur XAMPP)
 

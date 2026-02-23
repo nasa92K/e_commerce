@@ -1,43 +1,21 @@
-<?php
-// Démarrer la session pour gérer les données du panier
-session_start();
-?>
+<?php session_start(); $current_page = 'products'; ?>
 <!DOCTYPE html>
 <html lang="fr">
-
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>Lebron James | Figurine.com</title>
-    <link href="vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <title>LeBron James | Figurine Store</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/fontawesome.css">
     <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/theme.css">
 </head>
-
-<body>
-    <!-- Header -->
-    <header>
-        <nav class="navbar navbar-expand-lg">
-            <div class="container">
-                <a class="navbar-brand" href="index.php"><h2>Boutique de Figurine</h2></a>
-                <div class="collapse navbar-collapse" id="navbarResponsive">
-                    <ul class="navbar-nav ml-auto">
-                        <li class="nav-item"><a class="nav-link" href="index.php">Accueil</a></li>
-                        <li class="nav-item"><a class="nav-link" href="products.php">Produits</a></li>
-                        <li class="nav-item"><a class="nav-link" href="panier.php">Panier</a></li>
-                    </ul>
-                </div>
-            </div>
-        </nav>
-    </header>
-
-    <!-- Page Content -->
-    <div class="page-heading header-text" style="background-image: url('imagefigurine/POPlebronjames.jpg');">
-        <div class="container">
-            <h2>Lebron James</h2>
-        </div>
+<body class="theme-figurine">
+<?php include 'includes/header.php'; ?>
+    <div class="page-banner" style="background-image: url('imagefigurine/POPlebronjames.jpg');">
+        <div class="container"><div class="text-content"><h2>LeBron James</h2></div></div>
     </div>
-
-    <div class="products">
+    <div class="products theme-main">
         <div class="container">
             <div class="row">
                 <div class="col-md-6">
@@ -63,11 +41,6 @@ session_start();
         </div>
     </div>
 
-    <footer>
-        <div class="container">
-            <p>© 2025 Figurine.com</p>
-        </div>
-    </footer>
+<?php include 'includes/footer.php'; ?>
 </body>
-
 </html>

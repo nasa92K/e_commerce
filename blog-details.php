@@ -1,284 +1,271 @@
+<?php
+session_start();
+$current_page = 'blog';
+$base_assets = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
+$base_assets = ($base_assets === '' || $base_assets === '\\') ? '' : $base_assets . '/';
+
+// Données article (à brancher sur BDD plus tard)
+$article = [
+    'titre' => "L'Art de la Collection de Figurines",
+    'date' => '16 Fév 2026',
+    'auteur' => 'Anas Fekhar',
+    'auteur_avatar' => $base_assets . 'imagefigurine/Portrait Pro - Bureau.png',
+    'categorie' => 'Passion & Conseils',
+    'hero_image' => $base_assets . 'imagefigurine/figurine-luffy-gear-4th-one-piece-906.jpg',
+];
+
+// Figurines mentionnées (mini cartes sidebar)
+$figurines_article = [
+    ['nom' => 'Luffy Gear 5', 'image' => $base_assets . 'imagefigurine/figurine-luffy-gear-4th-one-piece-906.jpg', 'lien' => 'products.php', 'prix' => '169,99 €'],
+    ['nom' => 'Malenia Elden Ring', 'image' => $base_assets . 'imagefigurine/malenia.jpg', 'lien' => 'products.php', 'prix' => '189,99 €'],
+    ['nom' => 'Goku Ultra Instinct', 'image' => $base_assets . 'imagefigurine/product_figures_dragon-ball_blood-of-saiyans_goku_ultra-instinct.webp', 'lien' => 'products.php', 'prix' => '99,99 €'],
+];
+?>
 <!DOCTYPE html>
-<html lang="en">
-
-  <head>
-
+<html lang="fr">
+<head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <meta name="description" content="">
-    <meta name="author" content="">
-    <link rel="icon" href="assets/images/favicon.ico">
-
-    <link href="https://fonts.googleapis.com/css?family=Poppins:100,200,300,400,500,600,700,800,900&display=swap" rel="stylesheet">
-
-    <title>PHPJabbers.com | Vente de figurine en ligne</title>
-
-    <!-- Bootstrap core CSS -->
-    <link href="vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
-
-    <!-- Additional CSS Files -->
+    <title><?php echo htmlspecialchars($article['titre']); ?> | Figurine Store</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/fontawesome.css">
     <link rel="stylesheet" href="assets/css/style.css">
-    <link rel="stylesheet" href="assets/css/owl.css">
+    <link rel="stylesheet" href="assets/css/theme.css">
+    <style>
+        :root { --rouge: #D32F2F; --rouge-fonce: #B71C1C; --dark: #1a1a1a; --dark-soft: #2d2d2d; }
+        body.blog-detail-page { background: #0d0d0d; color: #e0e0e0; padding-top: 0; }
+        body.blog-detail-page .theme-main { padding-top: 5rem; }
 
-  </head>
+        /* Barre de lecture */
+        .reading-progress { position: fixed; top: 0; left: 0; height: 4px; background: var(--rouge); z-index: 1040; transition: width 0.15s ease; }
 
-  <body>
+        /* Zone article centrée max 800px */
+        .blog-article-wrap { max-width: 800px; margin: 0 auto; }
+        .blog-article-wrap .article-body { font-size: 1.1rem; line-height: 1.85; color: #c8c8c8; }
+        .blog-article-wrap .article-body p { margin-bottom: 1.25rem; }
 
-    <!-- ***** Preloader Start ***** -->
-    <div id="preloader">
-        <div class="jumper">
-            <div></div>
-            <div></div>
-            <div></div>
-        </div>
-    </div>  
-    <!-- ***** Preloader End ***** -->
+        /* H1 avec bordure gauche rouge */
+        .blog-title { font-size: clamp(1.75rem, 4vw, 2.5rem); font-weight: 800; color: #fff; border-left: 5px solid var(--rouge); padding-left: 1rem; margin: 2rem 0 1rem; line-height: 1.25; }
 
-    <!-- Header -->
-    <header class="">
-      <nav class="navbar navbar-expand-lg">
-        <div class="container">
-          <a class="navbar-brand" href="index.php"><h2>Boutique de Figurine <em>Website</em></h2></a>
-          <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-          </button>
-          <div class="collapse navbar-collapse" id="navbarResponsive">
-            <ul class="navbar-nav ml-auto">
-                <li class="nav-item">
-                    <a class="nav-link" href="index.php">Home
-                      <span class="sr-only">(current)</span>
-                    </a>
-                </li> 
+        /* Meta badges rouges transparents */
+        .meta-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; }
+        .meta-badges .badge-meta { background: rgba(211, 47, 47, 0.25); color: #ff8a80; border: 1px solid rgba(211, 47, 47, 0.5); padding: 0.35rem 0.75rem; border-radius: 50px; font-size: 0.8rem; font-weight: 600; }
 
-                <li class="nav-item"><a class="nav-link" href="products.php">Products</a></li>
+        /* Lettrine (drop cap) */
+        .article-body .drop-cap::first-letter { float: left; font-size: 3.5rem; line-height: 1; font-weight: 800; color: var(--rouge); margin: 0.1em 0.35rem 0 0; font-family: Georgia, serif; }
 
-                <li class="nav-item dropdown active">
-                    <a class="nav-link dropdown-toggle" data-toggle="dropdown" href="#" role="button" aria-haspopup="true" aria-expanded="false">More</a>
-                    
-                    <div class="dropdown-menu">
-                      <a class="dropdown-item" href="about-us.php">About Us</a>
-                      <a class="dropdown-item active" href="blog.php">Blog</a>
-                      <a class="dropdown-item" href="testimonials.php">Testimonials</a>
-                      <a class="dropdown-item" href="terms.php">Terms</a>
-                    </div>
-                </li>
-                
-                <li class="nav-item"><a class="nav-link" href="checkout.php">Checkout</a></li>
+        /* Blockquote avec guillemets rouges géants */
+        .article-body blockquote { position: relative; border: none; padding: 1.5rem 2rem 1.5rem 3.5rem; margin: 2rem 0; background: rgba(211, 47, 47, 0.08); border-left: 4px solid var(--rouge); border-radius: 0 12px 12px 0; font-style: italic; font-size: 1.15rem; color: #d0d0d0; }
+        .article-body blockquote::before { content: '"'; position: absolute; left: 0.75rem; top: -0.25rem; font-size: 4.5rem; color: var(--rouge); opacity: 0.6; font-family: Georgia, serif; line-height: 1; }
 
-                <li class="nav-item"><a class="nav-link" href="contact.php">Contact Us</a></li>
-            </ul>
-          </div>
-        </div>
-      </nav>
-    </header>
+        /* Images article rounded-3 + légende */
+        .article-body .img-article { border-radius: var(--bs-border-radius-3, 0.5rem); width: 100%; margin: 1.5rem 0; box-shadow: 0 8px 24px rgba(0,0,0,0.35); }
+        .article-body figcaption { font-size: 0.85rem; color: #888; margin-top: 0.5rem; margin-bottom: 1rem; }
 
-    <!-- Page Content -->
-    <div class="page-heading about-heading header-text" style="background-image: url(assets/images/heading-6-1920x500.jpg);">
-      <div class="container">
-        <div class="row">
-          <div class="col-md-12">
-            <div class="text-content">
-              <h4><i class="fa fa-user"></i>John Doe  &nbsp;&nbsp;&nbsp;&nbsp;  <i class="fa fa-calendar"></i> 12/06/2020 10:30   &nbsp;&nbsp;&nbsp;&nbsp; <i class="fa fa-eye"></i> 114</h4>
-              <h2>Lorem ipsum dolor sit amet, consectetur adipisicing</h2>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+        /* Sidebar dark */
+        .blog-sidebar .widget { background: var(--dark-soft); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid rgba(255,255,255,0.06); }
+        .blog-sidebar .widget-title { font-size: 1rem; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid rgba(211, 47, 47, 0.4); }
+        .blog-sidebar .mini-card { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); text-decoration: none; color: #e0e0e0; transition: background 0.2s; border-radius: 8px; }
+        .blog-sidebar .mini-card:hover { background: rgba(255,255,255,0.05); color: #fff; }
+        .blog-sidebar .mini-card img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; }
+        .blog-sidebar .mini-card .mini-card-price { font-size: 0.85rem; color: var(--rouge); font-weight: 700; }
 
-    <div class="products">
-      <div class="container">
-        <div class="row">
-            <div class="col-md-12">
-              <div class="section-heading">
-                <h2>Lorem ipsum dolor sit amet, consectetur.</h2>
-              </div>
-            </div>
+        /* Bouton Newsletter punchy */
+        .btn-newsletter { background: var(--rouge); color: #fff; border: none; font-weight: 700; padding: 0.85rem 1.5rem; border-radius: 8px; width: 100%; text-transform: uppercase; letter-spacing: 0.05em; transition: background 0.2s, transform 0.2s; }
+        .btn-newsletter:hover { background: var(--rouge-fonce); color: #fff; transform: translateY(-2px); }
 
-            <div class="col-md-8">
-                <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Quaerat, sed. Ex, id autem cum assumenda, quisquam cupiditate amet dolorem atque ipsam pariatur sequi voluptatem est nesciunt eum, aspernatur, tenetur rem. <br>
+        /* Commentaires */
+        .comments-list { list-style: none; padding: 0; margin: 0; }
+        .comments-list .comment-item { display: flex; gap: 1rem; margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.08); }
+        .comments-list .comment-avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(211, 47, 47, 0.4); flex-shrink: 0; }
+        .comments-list .comment-author { font-weight: 700; color: #fff; margin-bottom: 0.25rem; }
+        .comments-list .comment-date { font-size: 0.8rem; color: #888; }
+        .comments-list .comment-text { color: #b8b8b8; margin-top: 0.5rem; line-height: 1.6; }
+        .comment-form .form-control, .comment-form .form-select { background: var(--dark-soft); border: 1px solid rgba(255,255,255,0.1); color: #e0e0e0; border-radius: 8px; padding: 0.75rem 1rem; }
+        .comment-form .form-control:focus { border-color: var(--rouge); box-shadow: 0 0 0 0.25rem rgba(211, 47, 47, 0.25); color: #fff; }
+        .comment-form .form-control::placeholder { color: #666; }
+        .btn-submit-comment { background: var(--rouge); color: #fff; border: none; font-weight: 600; padding: 0.75rem 1.5rem; border-radius: 8px; transition: background 0.2s; }
+        .btn-submit-comment:hover { background: var(--rouge-fonce); color: #fff; }
 
-                <br>
+        /* Partage social */
+        .share-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 2rem; }
+        .share-buttons .btn-share { width: 44px; height: 44px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.2); color: #c8c8c8; transition: all 0.2s; text-decoration: none; }
+        .share-buttons .btn-share:hover { background: var(--rouge); border-color: var(--rouge); color: #fff; }
 
-                Lorem ipsum dolor sit amet, consectetur adipisicing elit. Cupiditate, consequatur, magnam. Dolorum vitae a vel quisquam. Fuga quia suscipit id veritatis sint earum impedit corporis quidem eum consectetur ipsam ex sequi ad, distinctio enim tenetur eveniet eligendi. Laborum, sapiente, magnam.</p>
+        /* Auteur sidebar */
+        .blog-sidebar .author-avatar { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid var(--rouge); margin-bottom: 0.75rem; }
+        .blog-sidebar .author-name { font-weight: 700; color: #fff; }
+        .blog-sidebar .author-bio { font-size: 0.9rem; color: #999; margin-top: 0.5rem; line-height: 1.5; }
+        .blog-sidebar .newsletter-input { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: #fff; }
+        .blog-sidebar .newsletter-input:focus { border-color: var(--rouge); box-shadow: 0 0 0 0.25rem rgba(211, 47, 47, 0.25); }
+    </style>
+</head>
+<body class="theme-figurine blog-detail-page">
+<?php include 'includes/header.php'; ?>
 
-                <br>
+<!-- Barre de lecture -->
+<div class="reading-progress" id="reading-progress" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%;"></div>
 
-                <h5>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Minus, modi.</h5>
-
-                <br>
-
-                <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Aperiam officia in adipisci. Corporis rem beatae cupiditate neque consequuntur necessitatibus expedita laudantium temporibus quam ex quidem, aut non blanditiis soluta deserunt dolores mollitia repudiandae voluptatibus perspiciatis dolor quos distinctio! Atque, magnam. <br>
-
-                <br>
-                Lorem ipsum dolor sit amet, consectetur adipisicing elit. Nesciunt dolore ducimus, ad itaque reprehenderit repellat dignissimos, qui velit dolores voluptas.</p>
-            </div>
-
-            <div class="col-md-4">
-              <div class="left-content">
-                <h4>Lorem ipsum dolor sit amet.</h4>
-
-                <br>
-                
-                <p>Lorem ipsum dolor sit amet, consectetur adipisic elit. Sed voluptate nihil eumester consectetur similiqu consectetur.<br><br>Lorem ipsum dolor sit amet, consectetur adipisic elit. Et, consequuntur, modi mollitia corporis ipsa voluptate corrupti.</p>
-                
-                <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Dolorum, minus?</p>
-              </div>
-            </div>
-        </div>
-
-        <br>
-        
-        <div>
-          <img src="assets/images/blog-image-fullscren-1-1920x700.jpg" class="img-fluid" alt="">
-        </div>
-      </div>
-    </div>
-
-    <div class="send-message">
-      <div class="container">
-        <div class="row">
-          <div class="col-md-12">
-            <div class="section-heading">
-              <h2>Leave a Comment</h2>
-            </div>
-          </div>
-          <div class="col-md-8">
-            <div class="contact-form">
-              <form id="contact" action="" method="post">
-                <div class="row">
-                  <div class="col-lg-12 col-md-12 col-sm-12">
-                    <fieldset>
-                      <input name="name" type="text" class="form-control" id="name" placeholder="Full Name" required="">
-                    </fieldset>
-                  </div>
-                  <div class="col-lg-12 col-md-12 col-sm-12">
-                    <fieldset>
-                      <input name="email" type="text" class="form-control" id="email" placeholder="E-Mail Address" required="">
-                    </fieldset>
-                  </div>
-                  <div class="col-lg-12">
-                    <fieldset>
-                      <textarea name="message" rows="6" class="form-control" id="message" placeholder="Your Message" required=""></textarea>
-                    </fieldset>
-                  </div>
-                  <div class="col-lg-12">
-                    <fieldset>
-                      <button type="submit" id="form-submit" class="filled-button">Submit</button>
-                    </fieldset>
-                  </div>
+<div class="container theme-main py-4 py-lg-5">
+    <div class="row">
+        <div class="col-lg-8">
+            <article class="blog-article-wrap">
+                <h1 class="blog-title"><?php echo htmlspecialchars($article['titre']); ?></h1>
+                <div class="meta-badges">
+                    <span class="badge-meta"><i class="fa fa-calendar me-1"></i> <?php echo htmlspecialchars($article['date']); ?></span>
+                    <span class="badge-meta"><i class="fa fa-user me-1"></i> <?php echo htmlspecialchars($article['auteur']); ?></span>
+                    <span class="badge-meta"><i class="fa fa-tag me-1"></i> <?php echo htmlspecialchars($article['categorie']); ?></span>
                 </div>
-              </form>
-            </div>
-          </div>
 
-          <div class="col-md-4">
-              <div class="left-content">
+                <div class="article-body">
+                    <p class="lead drop-cap">Bienvenue sur le blog officiel de <strong>Figurine Store</strong>. Aujourd'hui, nous plongeons au cœur de notre passion commune : pourquoi collectionner des figurines est bien plus qu'un simple hobby.</p>
 
-                <p>Lorem ipsum dolor sit amet, consectetur adipisic elit. Sed voluptate nihil eumester consectetur similiqu consectetur. Lorem ipsum dolor sit amet, consectetur adipisic elit. Et, consequuntur, modi mollitia corporis ipsa voluptate corrupti.</p>
+                    <h3 class="h5 text-white mt-4 mb-3">Une passion qui traverse les générations</h3>
+                    <p>Depuis la création de notre boutique en 2022 à Paris, nous avons vu défiler des milliers de collectionneurs. De la simple figurine <em>Pop!</em> à la résine 1/4 ultra-détaillée de chez Tsume, chaque pièce raconte une histoire. Pour nous, une figurine n'est pas un morceau de plastique, c'est la cristallisation d'une émotion ressentie devant un anime ou un jeu vidéo.</p>
 
-                <br> 
+                    <figure>
+                        <img src="<?php echo htmlspecialchars($article['hero_image']); ?>" alt="Figurine One Piece" class="img-article rounded-3">
+                        <figcaption>Figurine Luffy Gear 4 — One Piece, édition premium.</figcaption>
+                    </figure>
 
-                <ul class="social-icons">
-                  <li><a href="#"><i class="fa fa-facebook"></i></a></li>
-                  <li><a href="#"><i class="fa fa-twitter"></i></a></li>
-                  <li><a href="#"><i class="fa fa-linkedin"></i></a></li>
-                  <li><a href="#"><i class="fa fa-behance"></i></a></li>
+                    <blockquote class="mb-4">Une collection, c'est un musée personnel où chaque objet est un souvenir.</blockquote>
+
+                    <h3 class="h5 text-white mt-4 mb-3">Comment reconnaître une figurine authentique ?</h3>
+                    <p>Sur notre site, nous nous engageons à ne vendre que des produits officiels. Voici quelques astuces pour éviter les contrefaçons (bootlegs) :</p>
+                    <ul class="mb-4" style="color: #c8c8c8;">
+                        <li><strong>Le logo officiel :</strong> Cherchez les logos Toei Animation, Bandai ou Banpresto sur la boîte.</li>
+                        <li><strong>La qualité de la peinture :</strong> Les contrefaçons ont souvent des bavures ou des couleurs ternes.</li>
+                        <li><strong>Le prix :</strong> Si une figurine valant 150€ est vendue 30€, méfiez-vous !</li>
+                    </ul>
+
+                    <h3 class="h5 text-white mt-4 mb-3">Notre engagement envers vous</h3>
+                    <p>Chez <strong>Figurine Store</strong>, nous emballons chaque commande avec une protection maximale (papier bulle renforcé) car nous savons à quel point la boîte est importante pour un collectionneur. Notre équipe de passionnés est toujours disponible pour vous conseiller sur vos futurs achats.</p>
+
+                    <!-- Partage social -->
+                    <div class="share-buttons">
+                        <span class="text-muted me-2 align-self-center small">Partager :</span>
+                        <a href="https://twitter.com/intent/tweet?url=<?php echo urlencode('http://' . ($_SERVER['HTTP_HOST'] ?? '') . ($_SERVER['REQUEST_URI'] ?? '')); ?>&text=<?php echo urlencode($article['titre']); ?>" target="_blank" rel="noopener" class="btn-share" title="Twitter"><i class="fa fa-twitter"></i></a>
+                        <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo urlencode('http://' . ($_SERVER['HTTP_HOST'] ?? '') . ($_SERVER['REQUEST_URI'] ?? '')); ?>" target="_blank" rel="noopener" class="btn-share" title="Facebook"><i class="fa fa-facebook"></i></a>
+                        <a href="https://www.linkedin.com/shareArticle?mini=true&url=<?php echo urlencode('http://' . ($_SERVER['HTTP_HOST'] ?? '') . ($_SERVER['REQUEST_URI'] ?? '')); ?>&title=<?php echo urlencode($article['titre']); ?>" target="_blank" rel="noopener" class="btn-share" title="LinkedIn"><i class="fa fa-linkedin"></i></a>
+                        <button type="button" class="btn-share" id="btn-copy-link" title="Copier le lien"><i class="fa fa-link"></i></button>
+                    </div>
+                </div>
+            </article>
+
+            <!-- Commentaires -->
+            <section class="blog-article-wrap mt-5 pt-4 border-top border-secondary">
+                <h2 class="h4 text-white mb-4">Commentaires</h2>
+                <ul class="comments-list">
+                    <li class="comment-item">
+                        <img src="https://bootdey.com/img/Content/avatar/avatar1.png" alt="Avatar" class="comment-avatar">
+                        <div>
+                            <div class="comment-author">Marie L.</div>
+                            <div class="comment-date">15 Fév 2026</div>
+                            <p class="comment-text">Super article, ça donne envie de se lancer dans la collection. Merci pour les conseils anti-bootleg !</p>
+                        </div>
+                    </li>
+                    <li class="comment-item">
+                        <img src="https://bootdey.com/img/Content/avatar/avatar2.png" alt="Avatar" class="comment-avatar">
+                        <div>
+                            <div class="comment-author">Thomas K.</div>
+                            <div class="comment-date">14 Fév 2026</div>
+                            <p class="comment-text">J’adore la qualité des figurines proposées. Livraison soignée comme décrit.</p>
+                        </div>
+                    </li>
                 </ul>
-              </div>
+                <h3 class="h5 text-white mt-5 mb-3">Laisser un commentaire</h3>
+                <form class="comment-form" action="#" method="post">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <input type="text" name="author" class="form-control" placeholder="Votre nom" required>
+                        </div>
+                        <div class="col-md-6">
+                            <input type="email" name="email" class="form-control" placeholder="Votre email" required>
+                        </div>
+                        <div class="col-12">
+                            <textarea name="comment" class="form-control" rows="5" placeholder="Votre message..." required></textarea>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-submit-comment">Envoyer le message</button>
+                        </div>
+                    </div>
+                </form>
+            </section>
+        </div>
+
+        <aside class="col-lg-4 blog-sidebar">
+            <div class="widget">
+                <h5 class="widget-title">Figurines mentionnées dans cet article</h5>
+                <?php foreach ($figurines_article as $fig): ?>
+                <a href="<?php echo htmlspecialchars($fig['lien']); ?>" class="mini-card">
+                    <img src="<?php echo htmlspecialchars($fig['image']); ?>" alt="<?php echo htmlspecialchars($fig['nom']); ?>">
+                    <div class="flex-grow-1 min-w-0">
+                        <div class="fw-semibold text-truncate"><?php echo htmlspecialchars($fig['nom']); ?></div>
+                        <div class="mini-card-price"><?php echo htmlspecialchars($fig['prix']); ?></div>
+                    </div>
+                </a>
+                <?php endforeach; ?>
             </div>
-        </div>
-      </div>
-    </div>
 
-    <footer>
-      <div class="container">
-        <div class="row">
-          <div class="col-md-12">
-            <div class="inner-content">
-              <p>Copyright © 2020 Company Name - Template by: <a href="https://www.phpjabbers.com/">PHPJabbers.com</a></p>
+            <div class="widget text-center">
+                <img src="<?php echo htmlspecialchars($article['auteur_avatar']); ?>" alt="<?php echo htmlspecialchars($article['auteur']); ?>" class="author-avatar">
+                <div class="author-name"><?php echo htmlspecialchars($article['auteur']); ?></div>
+                <p class="text-danger small mb-0">Fondateur & Passionné</p>
+                <p class="author-bio">Je partage avec vous ma passion pour l'univers manga et les produits dérivés depuis plus de 5 ans.</p>
+                <div class="mt-2">
+                    <a href="#" class="btn-share me-1"><i class="fa fa-instagram"></i></a>
+                    <a href="#" class="btn-share me-1"><i class="fa fa-twitter"></i></a>
+                    <a href="#" class="btn-share"><i class="fa fa-youtube"></i></a>
+                </div>
             </div>
-          </div>
-        </div>
-      </div>
-    </footer>
 
-    <!-- Modal -->
-    <div class="modal fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
-      <div class="modal-dialog modal-lg" role="document">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="exampleModalLabel">Book Now</h5>
-            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-              <span aria-hidden="true">&times;</span>
-            </button>
-          </div>
-          <div class="modal-body">
-            <div class="contact-form">
-              <form action="#" id="contact">
-                  <div class="row">
-                       <div class="col-md-6">
-                          <fieldset>
-                            <input type="text" class="form-control" placeholder="Pick-up location" required="">
-                          </fieldset>
-                       </div>
+            <div class="widget">
+                <h5 class="widget-title">S'abonner à la Newsletter</h5>
+                <p class="small text-muted mb-3">Recevez nos nouveautés et offres exclusives.</p>
+                <form action="#" method="post" class="mb-2">
+                    <input type="email" name="newsletter_email" class="form-control mb-2 newsletter-input" placeholder="Votre email" required>
+                    <button type="submit" class="btn btn-newsletter">S'abonner</button>
+                </form>
+            </div>
 
-                       <div class="col-md-6">
-                          <fieldset>
-                            <input type="text" class="form-control" placeholder="Return location" required="">
-                          </fieldset>
-                       </div>
-                  </div>
-
-                  <div class="row">
-                       <div class="col-md-6">
-                          <fieldset>
-                            <input type="text" class="form-control" placeholder="Pick-up date/time" required="">
-                          </fieldset>
-                       </div>
-
-                       <div class="col-md-6">
-                          <fieldset>
-                            <input type="text" class="form-control" placeholder="Return date/time" required="">
-                          </fieldset>
-                       </div>
-                  </div>
-                  <input type="text" class="form-control" placeholder="Enter full name" required="">
-
-                  <div class="row">
-                       <div class="col-md-6">
-                          <fieldset>
-                            <input type="text" class="form-control" placeholder="Enter email address" required="">
-                          </fieldset>
-                       </div>
-
-                       <div class="col-md-6">
-                          <fieldset>
-                            <input type="text" class="form-control" placeholder="Enter phone" required="">
-                          </fieldset>
-                       </div>
-                  </div>
-              </form>
-           </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-            <button type="button" class="btn btn-primary">Book Now</button>
-          </div>
-        </div>
-      </div>
+            <div class="widget">
+                <h5 class="widget-title">Catégories</h5>
+                <ul class="list-unstyled mb-0">
+                    <li><a href="blog.php" class="text-decoration-none d-block py-2 text-muted small border-bottom border-secondary">One Piece</a></li>
+                    <li><a href="blog.php" class="text-decoration-none d-block py-2 text-muted small border-bottom border-secondary">Naruto Shippuden</a></li>
+                    <li><a href="blog.php" class="text-decoration-none d-block py-2 text-muted small border-bottom border-secondary">Dragon Ball Z</a></li>
+                    <li><a href="blog.php" class="text-decoration-none d-block py-2 text-muted small border-bottom border-secondary">Jujutsu Kaisen</a></li>
+                </ul>
+            </div>
+        </aside>
     </div>
+</div>
 
-
-    <!-- Bootstrap core JavaScript -->
-    <script src="vendor/jquery/jquery.min.js"></script>
-    <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
-
-
-    <!-- Additional Scripts -->
-    <script src="assets/js/custom.js"></script>
-    <script src="assets/js/owl.js"></script>
-  </body>
-
+<?php include 'includes/footer.php'; ?>
+<script src="vendor/jquery/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+(function() {
+    var progress = document.getElementById('reading-progress');
+    if (!progress) return;
+    function updateProgress() {
+        var scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        var docHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+        var pct = docHeight > 0 ? Math.min(100, (scrollTop / docHeight) * 100) : 0;
+        progress.style.width = pct + '%';
+        progress.setAttribute('aria-valuenow', Math.round(pct));
+    }
+    window.addEventListener('scroll', updateProgress, { passive: true });
+    updateProgress();
+})();
+document.getElementById('btn-copy-link') && document.getElementById('btn-copy-link').addEventListener('click', function() {
+    var url = window.location.href;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(function() { alert('Lien copié !'); });
+    } else {
+        var inp = document.createElement('input'); inp.value = url; document.body.appendChild(inp); inp.select(); document.execCommand('copy'); document.body.removeChild(inp); alert('Lien copié !');
+    }
+});
+</script>
+</body>
 </html>
