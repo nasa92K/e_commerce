@@ -23,6 +23,9 @@
           <li class="nav-item"><a class="nav-link" href="checkout.php">Commande</a></li>
           <li class="nav-item"><a class="nav-link" href="register.php">Inscription</a></li>
           <li class="nav-item"><a class="nav-link" href="contact.php">Contact</a></li>
+          <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin' && isset($_SESSION['email']) && $_SESSION['email'] === 'anasfigurine@gmail.com'): ?>
+          <li class="nav-item"><a class="nav-link text-danger font-weight-bold" href="admin_dashboard.php">Admin</a></li>
+          <?php endif; ?>
         </ul>
       </div>
     </div>

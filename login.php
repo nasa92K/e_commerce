@@ -1,29 +1,67 @@
 <?php
-require 'config.php';
 session_start();
 
-$message = '';
+// 1. Connexion à la base de données
+$host = "localhost";
+$db   = "figurine_db";
+$user = "root";
+$pass = "";
+
+try {
+    $conn = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch(PDOException $e) {
+    die("Erreur de connexion : " . $e->getMessage());
+}
+
+$message = "";
+
 if (isset($_GET['inscrit']) && (int)$_GET['inscrit'] === 1) {
     $message = "Inscription réussie ! Vous pouvez maintenant vous connecter.";
 }
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $email = trim($_POST["email"]);
-    $password = trim($_POST["password"]);
+    $email = $_POST['email'] ?? '';
+    $password = $_POST['password'] ?? '';
 
     if (!empty($email) && !empty($password)) {
-        $sql = "SELECT * FROM users WHERE email = :email";
-        $stmt = $conn->prepare($sql);
-        $stmt->execute([':email' => $email]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        // 2. Recherche de l'utilisateur
+        $stmt = $conn->prepare("SELECT * FROM users WHERE email = ?");
+        $stmt->execute([$email]);
+        $user = $stmt->fetch();
 
-        if ($user && password_verify($password, $user["password"])) {
-            $_SESSION["user_id"] = $user["id"];
-            $_SESSION["username"] = $user["username"];
-            $avatarPath = $user["avatar"] ?? $user["photo_profil"] ?? '';
-            $_SESSION["user_avatar"] = ($avatarPath !== '' && is_string($avatarPath)) ? $avatarPath : '';
+        // 3. Vérification du mot de passe
+        // Note: password_verify fonctionne avec password_hash()
+        // Si le mdp stocké est en clair, on peut tester une comparaison simple en fallback temporaire
+        $isValid = false;
+        if ($user) {
+            if (password_verify($password, $user['password'])) {
+                $isValid = true;
+            } elseif ($user['password'] === $password) {
+                // FALLBACK : le mot de passe est en clair, mettons-le à jour avec un hash !
+                $newHash = password_hash($password, PASSWORD_DEFAULT);
+                $updateStmt = $conn->prepare("UPDATE users SET password = ? WHERE id = ?");
+                $updateStmt->execute([$newHash, $user['id']]);
+                $isValid = true;
+            }
+        }
+
+        if ($isValid) {
+            // CONNEXION RÉUSSIE
+            $_SESSION['user_id'] = $user['id'];
+            $_SESSION['username'] = $user['username'];
+            $_SESSION['email'] = $user['email'];
+            $_SESSION['role'] = ($user['email'] === 'anasfigurine@gmail.com') ? 'admin' : 'client';
+            
+            // Attribution de la photo de profil, avec une image par défaut
+            $photo = $user['photo_profil'] ?? $user['avatar'] ?? null;
+            $_SESSION['photo_profil'] = $photo ?: 'imagefigurine/Portrait Pro - Bureau.png';
+            
+            // Compatibilité avec l'ancien code :
+            $_SESSION['user_avatar'] = $_SESSION['photo_profil'];
+            
             header("Location: index.php");
-            exit;
+            exit();
         } else {
             $message = "Email ou mot de passe incorrect.";
         }

@@ -127,6 +127,11 @@ if (!isset($pdo)) {
                     <li class="nav-item"><a class="nav-link" href="checkout.php">Commande</a></li>
                     <li class="nav-item"><a class="nav-link" href="contact.php">Contact</a></li>
                     <?php if (isset($_SESSION["user_id"])): ?>
+                        <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin' && isset($_SESSION['email']) && $_SESSION['email'] === 'anasfigurine@gmail.com'): ?>
+                        <li class="nav-item me-2 d-flex align-items-center">
+                            <a class="nav-link text-danger fw-bold border border-danger rounded px-2 py-1" href="admin_dashboard.php"><i class="fa fa-user-shield me-1"></i>Admin</a>
+                        </li>
+                        <?php endif; ?>
                         <li class="nav-item">
                             <a href="profile.php" class="user-profile-box" title="Mon Profil">
                                 <img src="<?php echo htmlspecialchars($user_avatar); ?>?t=<?php echo time(); ?>" class="profile-avatar rounded-circle" alt="Avatar" style="width: 35px; height: 35px; object-fit: cover; border: 2px solid #D32F2F;">

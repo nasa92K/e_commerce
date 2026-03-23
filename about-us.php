@@ -44,10 +44,8 @@
               <h4>Qui sommes-nous ?</h4>
               <p>Notre site E-commerce de vente de figurine est une boutique en ligne spécialisée dans la vente de figurines issues de l'univers geek, manga, cinéma et jeux vidéo. Que tu sois collectionneur ou fan à la recherche de la pièce parfaite pour ta collection, nous avons ce qu'il te faut !<br><br>Nous proposons une large gamme de figurines pour satisfaire tous les collectionneurs sur des thèmes diversifié tel que les mangas, cinéma, série ainsi que les jeux videos.</p>
               <ul class="social-icons">
-                <li><a href="#"><i class="fa fa-facebook"></i></a></li>
-                <li><a href="#"><i class="fa fa-twitter"></i></a></li>
-                <li><a href="#"><i class="fa fa-linkedin"></i></a></li>
-                <li><a href="#"><i class="fa fa-behance"></i></a></li>
+                <li><a href="https://github.com/nasa92K" target="_blank" title="Mon Profil GitHub"><i class="fa fa-github"></i></a></li>
+                <li><a href="http://localhost/PortfolioBTS/portfolio/" target="_blank" title="Mon Portfolio"><i class="fa fa-briefcase"></i></a></li>
               </ul>
             </div>
           </div>
