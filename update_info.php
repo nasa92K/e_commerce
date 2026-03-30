@@ -14,8 +14,8 @@ error_reporting(E_ALL);
 // Connexion à la base de données
 $host = 'localhost';
 $dbname = 'figurine_db'; // Mets ici le bon nom de ta BDD
-$username_db = 'root';
-$password_db = '';
+$username_db = 'anas';
+$password_db = 'anasdevelopper';
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username_db, $password_db);

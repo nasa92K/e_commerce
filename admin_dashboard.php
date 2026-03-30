@@ -11,8 +11,8 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin' || !isset($_SESSI
 // 2. Connexion PDO sécurisée à la base de données
 $host = "localhost";
 $db   = "figurine_db";
-$user = "root";
-$pass = "";
+$user = "anas";
+$pass = "anasdevelopper";
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);

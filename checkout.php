@@ -4,8 +4,8 @@ session_start();
 // --- 1. CONFIGURATION AVATAR & BDD ---
 $host = "localhost";
 $db   = "figurine_db";
-$user = "root";
-$pass = "";
+$user = "anas";
+$pass = "anasdevelopper";
 
 $base_assets = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
 $base_assets = ($base_assets === '' || $base_assets === '\\') ? '' : $base_assets . '/';

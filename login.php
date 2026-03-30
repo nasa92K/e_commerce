@@ -4,8 +4,8 @@ session_start();
 // 1. Connexion à la base de données
 $host = "localhost";
 $db   = "figurine_db";
-$user = "root";
-$pass = "";
+$user = "anas";
+$pass = "anasdevelopper";
 
 try {
     $conn = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);

@@ -16,8 +16,8 @@ if (isset($_SESSION['user_id'])) {
         try {
             $host = "localhost";
             $db   = "figurine_db";
-            $user = "root";
-            $pass = "";
+            $user = "anas";
+            $pass = "anasdevelopper";
             $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
             $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             $stmt = $pdo->prepare("SELECT username, avatar, photo_profil FROM users WHERE id = ?");
@@ -42,7 +42,7 @@ if (isset($_SESSION['user_id'])) {
 $canOrder = isset($_SESSION['cart']) && !empty($_SESSION['cart']);
 if (!isset($pdo)) {
     try {
-        $pdo = new PDO("mysql:host=localhost;dbname=figurine_db;charset=utf8", "root", "");
+        $pdo = new PDO("mysql:host=localhost;dbname=figurine_db;charset=utf8", "anas", "anasdevelopper");
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     } catch (PDOException $e) {
         $pdo = null;

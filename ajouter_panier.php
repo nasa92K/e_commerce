@@ -4,8 +4,8 @@ header('Content-Type: application/json');
 
 // Connexion à la base de données
 $serveur = "localhost";
-$utilisateur = "root";
-$mot_de_passe = "";
+$utilisateur = "anas";
+$mot_de_passe = "anasdevelopper";
 $base_de_donnees = "figurine_db";
 
 try {

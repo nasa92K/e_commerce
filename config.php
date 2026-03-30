@@ -1,8 +1,8 @@
 <?php
 $host = "localhost";  // Hôte (généralement localhost)
 $dbname = "figurine_db"; // Même base que le reste du site (table users dans users.sql)
-$username = "root"; // Nom d'utilisateur MySQL (par défaut root)
-$password = ""; // Mot de passe MySQL (laisser vide sur XAMPP)
+$username = "anas"; // Nom d'utilisateur MySQL (par défaut root)
+$password = "anasdevelopper"; // Mot de passe MySQL (laisser vide sur XAMPP)
 
 try {
     $conn = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $username, $password);
