@@ -12,10 +12,24 @@ try {
     $pdo = null;
 }
 
+// --- Pagination ---
+$produits_par_page = 8;
+$page_courante = max(1, (int)($_GET['page'] ?? 1));
+$offset = ($page_courante - 1) * $produits_par_page;
+
+$total_produits_db = 0;
 $produits = [];
 if ($pdo) {
-    $sql = "SELECT * FROM produits WHERE actif = 1 ORDER BY date_creation DESC";
+    // Compter le total pour calculer le nombre de pages
+    $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM produits WHERE actif = 1");
+    $stmtCount->execute();
+    $total_produits_db = (int)$stmtCount->fetchColumn();
+
+    // Récupérer uniquement la page courante
+    $sql = "SELECT * FROM produits WHERE actif = 1 ORDER BY date_creation DESC LIMIT :limit OFFSET :offset";
     $stmt = $pdo->prepare($sql);
+    $stmt->bindValue(':limit',  $produits_par_page, PDO::PARAM_INT);
+    $stmt->bindValue(':offset', $offset,            PDO::PARAM_INT);
     $stmt->execute();
     $produits = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
@@ -160,6 +174,13 @@ $figurines_catalogue = [
 $liste_affichage = !empty($produits) ? $produits : $figurines_catalogue;
 $current_page = 'products';
 
+// Pagination : si on utilise la liste statique, on pagine aussi
+if (empty($produits)) {
+    $total_produits_db = count($figurines_catalogue);
+    $liste_affichage   = array_slice($figurines_catalogue, $offset, $produits_par_page);
+}
+$total_pages = $total_produits_db > 0 ? (int)ceil($total_produits_db / $produits_par_page) : 1;
+
 // Base URL pour les assets (images) — permet un chargement correct en sous-dossier ou à la racine
 $base_assets = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
 $base_assets = ($base_assets === '' || $base_assets === '\\') ? '' : $base_assets . '/';
@@ -206,6 +227,33 @@ $base_assets = ($base_assets === '' || $base_assets === '\\') ? '' : $base_asset
         .product-card .btn-cart:hover { background: #B71C1C; color: #fff; transform: scale(1.02); }
         .product-card .btn-cart:disabled { background: #adb5bd; cursor: not-allowed; transform: none; }
         .toast-panier { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999; }
+
+        /* ===== Pagination ===== */
+        .pagination-wrap { display: flex; justify-content: center; align-items: center; gap: 0.4rem; flex-wrap: wrap; padding: 2.5rem 0 1rem; }
+        .pagination-wrap .pg-btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 2.4rem; height: 2.4rem; padding: 0 0.75rem;
+            border-radius: 8px; border: 1px solid rgba(0,0,0,0.12);
+            background: #fff; color: #1a1a1a; font-size: 0.875rem; font-weight: 600;
+            text-decoration: none; transition: all 0.2s ease; cursor: pointer;
+            line-height: 1;
+        }
+        .pagination-wrap .pg-btn:hover:not(.active):not(:disabled):not(.disabled) {
+            background: #fef2f2; border-color: #D32F2F; color: #D32F2F;
+            transform: translateY(-2px); box-shadow: 0 4px 12px rgba(211,47,47,0.15);
+        }
+        .pagination-wrap .pg-btn.active {
+            background: #D32F2F; border-color: #D32F2F; color: #fff;
+            box-shadow: 0 4px 12px rgba(211,47,47,0.35); cursor: default;
+        }
+        .pagination-wrap .pg-btn.disabled, .pagination-wrap .pg-btn:disabled {
+            opacity: 0.38; cursor: not-allowed; pointer-events: none;
+        }
+        .pagination-wrap .pg-ellipsis {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 2.4rem; height: 2.4rem; color: #999; font-size: 0.875rem;
+        }
+        .pagination-info { text-align: center; font-size: 0.8rem; color: #888; margin-top: -0.5rem; padding-bottom: 1.5rem; }
     </style>
 </head>
 <body class="theme-figurine">
@@ -221,7 +269,7 @@ $base_assets = ($base_assets === '' || $base_assets === '\\') ? '' : $base_asset
 
     <div class="container pb-5">
         <div class="products-toolbar">
-            <span class="result-count"><?php echo count($liste_affichage); ?> figurine(s) disponible(s)</span>
+            <span class="result-count"><?php echo $total_produits_db; ?> figurine(s) disponible(s)</span>
         </div>
 
         <div class="row g-4">
@@ -275,6 +323,65 @@ $base_assets = ($base_assets === '' || $base_assets === '\\') ? '' : $base_asset
             </div>
             <?php endforeach; ?>
         </div>
+
+        <?php if ($total_pages > 1): ?>
+        <!-- ===== Bloc Pagination ===== -->
+        <nav aria-label="Navigation des pages" class="mt-2">
+            <div class="pagination-wrap">
+
+                <?php /* Bouton Précédent */ ?>
+                <a href="?page=<?php echo max(1, $page_courante - 1); ?>"
+                   class="pg-btn<?php echo $page_courante <= 1 ? ' disabled' : ''; ?>"
+                   <?php echo $page_courante <= 1 ? 'aria-disabled="true" tabindex="-1"' : ''; ?>
+                   aria-label="Page précédente">
+                    &#8592; Précédent
+                </a>
+
+                <?php
+                // Calcule les numéros de pages à afficher (fenêtre glissante)
+                $window = 2; // pages autour de la page courante
+                $pages_a_afficher = [];
+                for ($i = 1; $i <= $total_pages; $i++) {
+                    if ($i === 1 || $i === $total_pages ||
+                        ($i >= $page_courante - $window && $i <= $page_courante + $window)) {
+                        $pages_a_afficher[] = $i;
+                    }
+                }
+                $dernier_affiche = 0;
+                foreach ($pages_a_afficher as $num):
+                    if ($dernier_affiche > 0 && $num - $dernier_affiche > 1):
+                ?>
+                        <span class="pg-ellipsis" aria-hidden="true">…</span>
+                <?php
+                    endif;
+                ?>
+                    <a href="?page=<?php echo $num; ?>"
+                       class="pg-btn<?php echo $num === $page_courante ? ' active' : ''; ?>"
+                       <?php echo $num === $page_courante ? 'aria-current="page"' : ''; ?>
+                       aria-label="Page <?php echo $num; ?>">
+                        <?php echo $num; ?>
+                    </a>
+                <?php
+                    $dernier_affiche = $num;
+                endforeach;
+                ?>
+
+                <?php /* Bouton Suivant */ ?>
+                <a href="?page=<?php echo min($total_pages, $page_courante + 1); ?>"
+                   class="pg-btn<?php echo $page_courante >= $total_pages ? ' disabled' : ''; ?>"
+                   <?php echo $page_courante >= $total_pages ? 'aria-disabled="true" tabindex="-1"' : ''; ?>
+                   aria-label="Page suivante">
+                    Suivant &#8594;
+                </a>
+            </div>
+            <p class="pagination-info">
+                Page <?php echo $page_courante; ?> sur <?php echo $total_pages; ?>
+                &nbsp;·&nbsp;
+                <?php echo $total_produits_db; ?> figurines au total
+            </p>
+        </nav>
+        <?php endif; ?>
+
     </div>
 </main>
 

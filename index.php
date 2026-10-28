@@ -120,6 +120,7 @@ if (!isset($pdo)) {
                         <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Plus</a>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="about-us.php">À propos</a></li>
+                            <li><a class="dropdown-item" href="blog.php">Blog</a></li>
                             <li><a class="dropdown-item" href="avis.php">Avis</a></li>
                             <li><a class="dropdown-item" href="terms.php">Infos</a></li>
                         </ul>
